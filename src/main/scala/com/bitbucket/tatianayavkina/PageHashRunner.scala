@@ -12,6 +12,7 @@ object PageHashRunner {
     Future {
       val content = Source.fromURL(pageUrl).mkString
       val hash = calculateHash(content)
+      Console.out.print("hash=", hash)
       PageHash(pageUrl, hash)
     }
   }
