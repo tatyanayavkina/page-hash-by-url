@@ -2,17 +2,16 @@ package com.bitbucket.tatianayavkina
 
 import java.security.MessageDigest
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.io.Source
 
 object PageHashRunner {
 
-  def getPageHash(pageUrl: String): Future[PageHash] = {
+  def getPageHash(pageUrl: String)(implicit executionContext: ExecutionContext): Future[PageHash] = {
     Future {
       val content = Source.fromURL(pageUrl).mkString
       val hash = calculateHash(content)
-      Console.out.print("hash=", hash)
       PageHash(pageUrl, hash)
     }
   }
