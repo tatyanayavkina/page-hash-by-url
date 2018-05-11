@@ -9,7 +9,7 @@ object PageUrlValidator {
       new URI(url)
       true
     } catch {
-      case URISyntaxException => false
+      case e: URISyntaxException => false
     }
   }
 }
