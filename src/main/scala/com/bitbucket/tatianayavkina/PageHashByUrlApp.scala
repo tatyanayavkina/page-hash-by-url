@@ -30,14 +30,6 @@ object PageHashByUrlApp extends App with LazyLogging {
     Await.ready(actorSystem.whenTerminated, 30.seconds)
   }
 
-//  val hashingFuture = Future.sequence(
-//    Source.fromFile(args(0))(Codec.UTF8)
-//      .getLines()
-//      .toList
-//      .filter(PageUrlValidator.isValid)
-//      .map(PageHashRunner.getPageHash)
-//  )
-
   val hashingFuture =
     FileIO.fromPath(Paths.get(args(0)))
       .via(Framing.delimiter(ByteString(System.lineSeparator), 1024, true))
