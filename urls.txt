@@ -1,5 +1,6 @@
 https://stackoverflow.com
 https://github.com
+http://tratata.com
 https://yandex.ru
 https://bash.im
 https://www.microsoft.com

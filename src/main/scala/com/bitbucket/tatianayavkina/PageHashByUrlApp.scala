@@ -1,18 +1,15 @@
 package com.bitbucket.tatianayavkina
 
 import scala.concurrent.Await
-import scala.util.{Failure, Success}
 import scala.concurrent.duration._
-import scala.util.Try
 import com.typesafe.scalalogging.LazyLogging
 import java.nio.file.Paths
 
 import akka.actor.ActorSystem
-import akka.stream.ActorAttributes
 import akka.stream.ActorMaterializer
-import akka.stream.Supervision
 import akka.stream.scaladsl._
 import akka.util.ByteString
+import com.bitbucket.tatianayavkina.model.{HashCalculatingResult, PageHash, PageHashError}
 
 object PageHashByUrlApp extends App with LazyLogging {
 
@@ -36,17 +33,22 @@ object PageHashByUrlApp extends App with LazyLogging {
       .map(_.utf8String)
       .filter(PageUrlValidator.isValid)
       .mapAsync(4)(PageHashRunner.getPageHash)
-      .withAttributes(ActorAttributes.supervisionStrategy({ exception =>
-        logger.warn(s"An exception occurred in hashing flow, dropping a url and continue", exception)
-        Supervision.Resume
-      }))
       .runWith(Sink.seq)
 
-  val hashingBlockingResult = Try(Await.result(hashingFuture, 20.seconds))
-  hashingBlockingResult match {
-    case Success(result) => logger.info(s"result:\n${result.mkString("\n")}\n")
-    case Failure(ex) => logger.error(s"A fatal exception during hashing process")
-  }
+  val hashingBlockingResult = Await.result(hashingFuture, 20.seconds)
+  HashFileWriter.addToFile(processResults(hashingBlockingResult))
 
   sys.exit(0)
+
+  private def processResults(hashingBlockingResult: Seq[HashCalculatingResult]): String = {
+    val stringBuilder: StringBuilder = new StringBuilder
+    for(result <- hashingBlockingResult) {
+      result match {
+        case PageHash(url, hash) => stringBuilder.append(s"$url, $hash\n")
+        case PageHashError(url, error) => stringBuilder.append(s"$url, $error\n")
+      }
+    }
+
+    stringBuilder.toString()
+  }
 }

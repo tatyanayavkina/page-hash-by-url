@@ -3,6 +3,7 @@ package com.bitbucket.tatianayavkina
 import java.io.InputStream
 import java.security.MessageDigest
 
+import com.bitbucket.tatianayavkina.model.{HashCalculatingResult, PageHash, PageHashError}
 import com.typesafe.scalalogging.LazyLogging
 import javax.xml.bind.DatatypeConverter
 
@@ -13,17 +14,20 @@ object PageHashRunner extends LazyLogging {
 
   val bufferSize = 4096
 
-  def getPageHash(pageUrl: String)(implicit executionContext: ExecutionContext): Future[PageHash] = {
+  def getPageHash(pageUrl: String)(implicit executionContext: ExecutionContext): Future[HashCalculatingResult] = {
     Future {
-      val stream: InputStream = UrlStreamProvider.getInputStream(pageUrl)
+      var stream: InputStream = null
       try {
+        stream = UrlStreamProvider.getInputStream(pageUrl)
         val hashCalculator: MessageDigest = MessageDigest.getInstance("MD5")
         val hash = calculateHash(stream, hashCalculator)
         PageHash(pageUrl, hash)
       } catch {
-        case e: Exception => PageHash(pageUrl, "")
+        case e: Exception => PageHashError(pageUrl, s"${e.getClass.getSimpleName}:${e.getMessage}")
       } finally {
-        stream.close()
+        if (stream != null) {
+          stream.close()
+        }
       }
     }
   }
