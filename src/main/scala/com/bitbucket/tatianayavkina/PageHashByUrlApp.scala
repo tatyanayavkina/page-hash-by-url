@@ -5,8 +5,9 @@ import scala.concurrent.duration._
 import com.typesafe.scalalogging.LazyLogging
 import java.nio.file.Paths
 
+import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.stream.{ActorMaterializer}
+import akka.stream.{ActorMaterializer, IOResult}
 import akka.stream.scaladsl._
 import akka.util.ByteString
 import com.bitbucket.tatianayavkina.model.HashCalculatingResult
@@ -27,20 +28,30 @@ object PageHashByUrlApp extends App with LazyLogging {
     Await.ready(actorSystem.whenTerminated, 30.seconds)
   }
 
-  val hashingFuture : Future[Seq[HashCalculatingResult]] =
+  def getPipelineSource: Source[ByteString, Future[IOResult]] = {
     FileIO.fromPath(Paths.get(args(0)))
       .via(Framing.delimiter(ByteString(System.lineSeparator), 1024, true))
+  }
+
+  def getParseFlow: Flow[ByteString, HashCalculatingResult, NotUsed] = {
+    Flow[ByteString]
       .map(_.utf8String)
       .filter(PageUrlValidator.isValid)
       .mapAsync(4)(PageHashRunner.getPageHash)
-      .runWith(Sink.seq)
+  }
 
-  val hashingBlockingResult : Seq[HashCalculatingResult] = Await.result(hashingFuture, 20.seconds)
+  def getPipeOut: Sink[HashCalculatingResult, Future[IOResult]] = Flow[HashCalculatingResult]
+      .map(_.toString)
+      .map(ByteString(_))
+      .toMat(FileIO.toPath(Paths.get("result.txt")))(Keep.right)
 
-  hashingBlockingResult.runWith(Flow[String]
-    .map(_.toString)
-    .map(ByteString(_))
-    .toMat(FileIO.toPath(Paths.get("result.txt"))))
+  def buildAndRun: Future[IOResult] = {
+    getPipelineSource
+      .via(getParseFlow)
+      .runWith(getPipeOut)
+  }
+
+  Await.result(buildAndRun, 40.seconds)
 
   sys.exit(0)
 }
