@@ -1,15 +1,15 @@
 package com.bitbucket.tatianayavkina
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import com.typesafe.scalalogging.LazyLogging
 import java.nio.file.Paths
 
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
+import akka.stream.{ActorMaterializer}
 import akka.stream.scaladsl._
 import akka.util.ByteString
-import com.bitbucket.tatianayavkina.model.{HashCalculatingResult, PageHash, PageHashError}
+import com.bitbucket.tatianayavkina.model.HashCalculatingResult
 
 object PageHashByUrlApp extends App with LazyLogging {
 
@@ -27,7 +27,7 @@ object PageHashByUrlApp extends App with LazyLogging {
     Await.ready(actorSystem.whenTerminated, 30.seconds)
   }
 
-  val hashingFuture =
+  val hashingFuture : Future[Seq[HashCalculatingResult]] =
     FileIO.fromPath(Paths.get(args(0)))
       .via(Framing.delimiter(ByteString(System.lineSeparator), 1024, true))
       .map(_.utf8String)
@@ -35,20 +35,12 @@ object PageHashByUrlApp extends App with LazyLogging {
       .mapAsync(4)(PageHashRunner.getPageHash)
       .runWith(Sink.seq)
 
-  val hashingBlockingResult = Await.result(hashingFuture, 20.seconds)
-  HashFileWriter.addToFile(processResults(hashingBlockingResult))
+  val hashingBlockingResult : Seq[HashCalculatingResult] = Await.result(hashingFuture, 20.seconds)
+
+  hashingBlockingResult.runWith(Flow[String]
+    .map(_.toString)
+    .map(ByteString(_))
+    .toMat(FileIO.toPath(Paths.get("result.txt"))))
 
   sys.exit(0)
-
-  private def processResults(hashingBlockingResult: Seq[HashCalculatingResult]): String = {
-    val stringBuilder: StringBuilder = new StringBuilder
-    for(result <- hashingBlockingResult) {
-      result match {
-        case PageHash(url, hash) => stringBuilder.append(s"$url, $hash\n")
-        case PageHashError(url, error) => stringBuilder.append(s"$url, $error\n")
-      }
-    }
-
-    stringBuilder.toString()
-  }
 }
