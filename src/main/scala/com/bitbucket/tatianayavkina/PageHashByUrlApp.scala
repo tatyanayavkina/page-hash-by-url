@@ -4,6 +4,7 @@ import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import com.typesafe.scalalogging.LazyLogging
 import java.nio.file.Paths
+import java.util.concurrent.atomic.AtomicLong
 
 import akka.NotUsed
 import akka.actor.ActorSystem
@@ -23,6 +24,8 @@ object PageHashByUrlApp extends App with LazyLogging {
   implicit val actorMaterializer = ActorMaterializer()
   implicit val executionContext = actorSystem.dispatcher
 
+  val processedTaskCount: AtomicLong = new AtomicLong()
+
   sys.addShutdownHook {
     actorSystem.terminate()
     Await.ready(actorSystem.whenTerminated, 30.seconds)
@@ -40,18 +43,35 @@ object PageHashByUrlApp extends App with LazyLogging {
       .mapAsync(4)(PageHashRunner.getPageHash)
   }
 
-  def getPipeOut: Sink[HashCalculatingResult, Future[IOResult]] = Flow[HashCalculatingResult]
-      .map(_.toString)
-      .map(ByteString(_))
-      .toMat(FileIO.toPath(Paths.get("result.txt")))(Keep.right)
-
-  def buildAndRun: Future[IOResult] = {
+  def buildAndRun() = {
     getPipelineSource
       .via(getParseFlow)
-      .runWith(getPipeOut)
+      .map(_.toString)
+      .map(ByteString(_))
+      .alsoToMat(FileIO.toPath(Paths.get("result.txt")))(Keep.right)
+      .runWith(Sink.foreach((_) => processedTaskCount.incrementAndGet))
   }
 
-  Await.result(buildAndRun, 40.seconds)
+  def getTaskCount(fileName: String): Long = {
+    Await.result(FileIO.fromPath(Paths.get(args(0)))
+        .via(Framing.delimiter(ByteString(System.lineSeparator), 1024, true))
+        .map(_.utf8String)
+        .filter(PageUrlValidator.isValid)
+        .runWith(Sink.fold[Long, String](0)((acc, _) => acc + 1)),
+      10.seconds)
+  }
 
+  def waitTasks(): Unit = {
+    while (processedTaskCount.get() < taskCount) {
+      logger.info("Processed {}/{} tasks", processedTaskCount.get(), taskCount)
+      Thread.sleep(500)
+    }
+  }
+
+  val taskCount = getTaskCount(args(0))
+  buildAndRun()
+  waitTasks()
+
+  logger.info("All tasks processed")
   sys.exit(0)
 }
