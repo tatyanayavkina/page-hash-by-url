@@ -1,8 +1,8 @@
-package com.bitbucket.tatianayavkina
+package com.bitbucket.tatianayavkina.service
 
 import java.net.{URI, URISyntaxException}
 
-object PageUrlValidator {
+object UrlValidatorService {
 
   def isValid(url: String): Boolean = {
     try {

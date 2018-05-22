@@ -1,14 +1,14 @@
-package com.bitbucket.tatianayavkina
+package com.bitbucket.tatianayavkina.service
 
 import java.io.InputStream
 import java.security.MessageDigest
 
+import com.bitbucket.tatianayavkina.UrlStreamProvider
 import com.bitbucket.tatianayavkina.model.{HashCalculatingResult, PageHash, PageHashError}
 import com.typesafe.scalalogging.LazyLogging
 import javax.xml.bind.DatatypeConverter
 
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 object PageHashRunner extends LazyLogging {
 
