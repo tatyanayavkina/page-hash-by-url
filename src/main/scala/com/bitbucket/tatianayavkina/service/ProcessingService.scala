@@ -17,7 +17,7 @@ object ProcessingService {
     getPipelineSource(sourceFile)
       .via(getParseFlow)
       .via(getProcessedCountFlow(processedTaskCounter))
-      .runWith(getPipeOut("result.txt"))
+      .runWith(getPipeOut(resultFile))
 
   private def getPipelineSource(sourceFile: String): Source[ByteString, Future[IOResult]] =
     FileIO.fromPath(Paths.get(sourceFile))
